@@ -1,0 +1,33 @@
+{
+  "name": "01-socket-server-basic",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.8.1",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "express-fileupload": "^1.4.0",
+    "express-validator": "^6.14.2",
+    "ip": "^2.0.1",
+    "jsonwebtoken": "^8.5.1",
+    "moment": "^2.29.4",
+    "mysql2": "^2.3.3",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.6.7",
+    "ping": "^0.4.4",
+    "sequelize": "^6.21.2",
+    "socket.io": "^4.5.1",
+    "uuid": "^8.3.2"
+  }
+}
