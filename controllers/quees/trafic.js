@@ -21,7 +21,17 @@ const filterByIp = async (id, queues) => {
     return cidrs.some((cidr) => ipLib.cidrSubnet(cidr).contains(ipTarget));
   });
 };
-
+/**
+ * Calcula el delta de tráfico entre el valor actual del MK y el último guardado.
+ * @param {number} actual - Valor actual del MK (bytes RX o TX)
+ * @param {number|null} anterior - Último valor guardado (bytes RX o TX)
+ * @returns {number} - Diferencia real (delta) para sumar al día
+ */
+const calcularDelta = (actual, anterior) => {
+  if (anterior == null) return actual; // primera vez, tomar todo como delta
+  const delta = actual - anterior;
+  return delta >= 0 ? delta : actual; // si reinició el MK, el delta es el valor actual
+};
 const getQueesTrafic = async ({ ip, port, password, user, id }) => {
   try {
     const authHeader = buildAuthHeader(user, password);
