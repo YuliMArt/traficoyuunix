@@ -47,35 +47,59 @@ const getQueesTrafic = async ({ ip, port, password, user, id }) => {
     const registros = [];
     const updates = [];
     for (let q of queues) {
-      const [upStr, downStr] = q.bytes.split("/"); // invertir
-      const up = parseInt(upStr); // subida
-      const down = parseInt(downStr); // bajada
+      const [upStr, downStr] = q.bytes.split("/");
+      const upActual = parseInt(upStr); // subida acumulada en el MK
+      const downActual = parseInt(downStr); // bajada acumulada en el MK
       const [ipTarget] = q.target.split("/");
+
       const serIp = servicioMap.get(ipTarget);
       if (!serIp) continue;
-      const existe = await TraficoCus.findOne({
-        attributes: ["id"],
+
+      const ultimoHoy = await TraficoCus.findOne({
         where: {
           idser: serIp.id,
-          idus: serIp.idcliente,
-          idmk: serIp.idnodo,
-          ip: ipTarget,
           fecha: Sequelize.fn("CURDATE"),
         },
+        order: [["id", "DESC"]],
       });
 
-      if (existe) {
-        updates.push({ id: existe.id, up, down });
+      if (ultimoHoy) {
+        // Ya existe registro del día → usar delta sobre el último de hoy
+        upDelta = calcularDelta(upActual, ultimoHoy.up);
+        downDelta = calcularDelta(downActual, ultimoHoy.down);
+
+        await TraficoCus.update(
+          {
+            up: ultimoHoy.up + upDelta,
+            down: ultimoHoy.down + downDelta,
+          },
+          { where: { id: ultimoHoy.id } }
+        );
       } else {
-        registros.push({
+        // Primer registro del día → buscar último de AYER
+        const ultimoAyer = await TraficoCus.findOne({
+          where: {
+            idser: serIp.id,
+            fecha: Sequelize.literal("DATE_SUB(CURDATE(), INTERVAL 1 DAY)"),
+          },
+          order: [["id", "DESC"]],
+        });
+
+        let upBase = 0,
+          downBase = 0;
+        if (ultimoAyer) {
+          upBase = ultimoAyer.up;
+          downBase = ultimoAyer.down;
+        }
+
+        await TraficoCus.create({
           idser: serIp.id,
           idus: serIp.idcliente,
           idmk: serIp.idnodo,
           mac: serIp.mac,
           ip: ipTarget,
-
-          up,
-          down,
+          up: calcularDelta(upActual, upBase),
+          down: calcularDelta(downActual, downBase),
           fecha: Sequelize.fn("CURDATE"),
         });
       }
