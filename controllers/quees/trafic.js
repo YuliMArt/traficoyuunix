@@ -7,6 +7,7 @@ const Ipv4s = require("../../models/ynx/Ipv4");
 const Servicio = require("../../models/tblservicios");
 const TraficoCus = require("../../models/tltrafico");
 const { Sequelize } = require("sequelize");
+const moment = require("moment");
 
 const buildAuthHeader = (user, password) =>
   "Basic " + Buffer.from(`${user}:${password}`).toString("base64");
@@ -21,119 +22,120 @@ const filterByIp = async (id, queues) => {
     return cidrs.some((cidr) => ipLib.cidrSubnet(cidr).contains(ipTarget));
   });
 };
-/**
- * Calcula el delta de tráfico entre el valor actual del MK y el último guardado.
- * @param {number} actual - Valor actual del MK (bytes RX o TX)
- * @param {number|null} anterior - Último valor guardado (bytes RX o TX)
- * @returns {number} - Diferencia real (delta) para sumar al día
- */
-const calcularDelta = (actual, anterior) => {
-  if (anterior == null) return actual; // primera vez, tomar todo como delta
-  const delta = actual - anterior;
-  return delta >= 0 ? delta : actual; // si reinició el MK, el delta es el valor actual
-};
+
 const getQueesTrafic = async ({ ip, port, password, user, id }) => {
   try {
     const authHeader = buildAuthHeader(user, password);
-    let config = {
+    const config = {
       method: "get",
       maxBodyLength: Infinity,
       url: `http://${ip}:${port}/rest/queue/simple`,
-      headers: {
-        Authorization: authHeader,
-      },
+      headers: { Authorization: authHeader },
     };
 
     const response = await axios.request(config);
-    let queues = response.data;
-    // // filtrar queues según IP dentro de rango
-    queues = await filterByIp(id, queues);
+    let queues = await filterByIp(id, response.data);
+
     const servicios = await Servicio.findAll({
       attributes: ["id", "idnodo", "mac", "idcliente", "ip"],
       where: { idnodo: id },
     });
     const servicioMap = new Map(servicios.map((s) => [s.ip, s]));
-    // 🚀 2. Preparar arrays para inserción masiva
+
+    const today = moment().format("YYYY-MM-DD");
+    const yesterday = moment(today).subtract(1, "day").format("YYYY-MM-DD");
+
     const registros = [];
     const updates = [];
+
     for (let q of queues) {
       const [upStr, downStr] = q.bytes.split("/");
-      const upActual = parseInt(upStr); // subida acumulada en el MK
-      const downActual = parseInt(downStr); // bajada acumulada en el MK
+      const upActual = parseInt(upStr);
+      const downActual = parseInt(downStr);
       const [ipTarget] = q.target.split("/");
 
       const serIp = servicioMap.get(ipTarget);
       if (!serIp) continue;
 
+      // último registro de hoy
       const ultimoHoy = await TraficoCus.findOne({
         where: {
           idser: serIp.id,
-          fecha: Sequelize.fn("CURDATE"),
+          idus: serIp.idcliente,
+          idmk: serIp.idnodo,
+          ip: ipTarget,
+          fecha: today,
         },
         order: [["id", "DESC"]],
       });
 
+      // último registro de ayer
+      const ultimoAyer = await TraficoCus.findOne({
+        where: {
+          idser: serIp.id,
+          idus: serIp.idcliente,
+          idmk: serIp.idnodo,
+          ip: ipTarget,
+          fecha: yesterday,
+        },
+        order: [["id", "DESC"]],
+      });
+
+      let baseUp = 0;
+      let baseDown = 0;
+
+     if (ultimoAyer) {
+        baseUp = ultimoAyer.up;
+        baseDown = ultimoAyer.down;
+      }
+
+      // Calcular delta con reinicio contemplado
+      const deltaUp = upActual >= baseUp ? upActual - baseUp : upActual;
+      const deltaDown = downActual >= baseDown ? downActual - baseDown : downActual;
+
+      console.log('SUBIDA ACTUAL',upActual,"diferencia - ",ultimoAyer.up,"=+++++++",upActual-ultimoAyer.up,"DELTEA",deltaUp);
+
       if (ultimoHoy) {
-        // Ya existe registro del día → usar delta sobre el último de hoy
-        upDelta = calcularDelta(upActual, ultimoHoy.up);
-        downDelta = calcularDelta(downActual, ultimoHoy.down);
-
-        await TraficoCus.update(
-          {
-            up: ultimoHoy.up + upDelta,
-            down: ultimoHoy.down + downDelta,
-          },
-          { where: { id: ultimoHoy.id } }
-        );
-      } else {
-        // Primer registro del día → buscar último de AYER
-        const ultimoAyer = await TraficoCus.findOne({
-          where: {
-            idser: serIp.id,
-            fecha: Sequelize.literal("DATE_SUB(CURDATE(), INTERVAL 1 DAY)"),
-          },
-          order: [["id", "DESC"]],
+        // actualizar acumulando el delta
+        updates.push({
+          id: ultimoHoy.id,
+          up:  deltaUp,
+          down:  deltaDown,
         });
-
-        let upBase = 0,
-          downBase = 0;
-        if (ultimoAyer) {
-          upBase = ultimoAyer.up;
-          downBase = ultimoAyer.down;
-        }
-
-        await TraficoCus.create({
+      } else {
+        // primer registro del día → crear nuevo
+        registros.push({
           idser: serIp.id,
           idus: serIp.idcliente,
           idmk: serIp.idnodo,
           mac: serIp.mac,
           ip: ipTarget,
-          up: calcularDelta(upActual, upBase),
-          down: calcularDelta(downActual, downBase),
-          fecha: Sequelize.fn("CURDATE"),
+          up: deltaUp,
+          down: deltaDown,
+          fecha: today,
         });
       }
     }
 
-    //   🚀 3. Ejecutar en bloque
-
-    // Aquí puedes guardar en tu base de datos
+    // Guardar nuevos
     if (registros.length > 0) {
       await TraficoCus.bulkCreate(registros);
     }
 
-    if (updates.length > 0) {
-      for (const u of updates) {
-        await TraficoCus.update(
-          { up: u.up, down: u.down },
-          { where: { id: u.id } }
-        );
-      }
+    // Actualizar existentes
+    for (const u of updates) {
+      await TraficoCus.update(
+        { up: u.up, down: u.down },
+        { where: { id: u.id } }
+      );
     }
+
+    console.log(`MK ${ip}: insertados ${registros.length}, actualizados ${updates.length}`);
   } catch (err) {
     console.error(`Error al procesar MK ${ip}:`, err.message);
   }
 };
+
 
 const getTraficmks = async () => {
   const mikrotikIPs = await Servers.findAll();
