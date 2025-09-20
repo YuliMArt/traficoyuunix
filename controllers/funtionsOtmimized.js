@@ -4,7 +4,7 @@ const TrD = require("../models/trdays");
 const { QueryTypes } = require("sequelize");
 const Servicio = require("../models/tblservicios");
 const Emisor = require("../models/emisores");
-const  ping = require('ping');
+const ping = require("ping");
 
 const Olt = require("../models/ynx/olts");
 const sumTraficDay = async () => {
@@ -63,18 +63,32 @@ const pingClientes = async () => {
 };
 const pingOlts = async () => {
   const olts = await Olt.findAll();
+
   for (let i = 0; i < olts.length; i++) {
     const rts = olts[i];
+    let chOlt = rts.status === "ONLINE" ? true : false;
     let res = await ping.promise.probe(rts.ip);
-    let alive = "ONLINE";
-    if (!res.alive) alive = "OFFLINE";
-    if (alive != rts.status) {
+
+    // Caso: se mantiene igual pero limpiar ping si estaba en error
+    if (res.alive == chOlt && rts.ping != 0) {
+      await Olt.update({ counter: 0 }, { where: { id: rts.id } });
+    }
+
+    // Caso: pasó de OFFLINE → ONLINE
+    if (res.alive != chOlt && res.alive) {
       await Olt.update(
-        { status: alive },
-        {
-          where: { id: rts.id },
-        }
+        { status: "ONLINE", counter: 0 },
+        { where: { id: rts.id } }
       );
+    }
+
+    // Caso: pasó de ONLINE → OFFLINE (con contador)
+    if (res.alive != chOlt && res.alive == false) {
+      await Olt.update({ counter: rts.counter + 1 }, { where: { id: rts.id } });
+
+      if (rts.counter > 5 && res.alive != chOlt) {
+        await Olt.update({ status: 0 }, { where: { id: rts.id } });
+      }
     }
   }
 };

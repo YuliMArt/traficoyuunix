@@ -60,5 +60,8 @@ const Olt = db.define("olts", {
   hostid : {
        type: DataTypes.INTEGER,
   },
+  counter : {
+       type: DataTypes.INTEGER,
+  },
 });
 module.exports = Olt;

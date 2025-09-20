@@ -38,6 +38,9 @@ const Onu = db.define("onus", {
   nserie: {
     type: DataTypes.STRING,
   },
+  modelo : {
+       type: DataTypes.STRING,
+  },
   vlan: {
     type: DataTypes.INTEGER,
   },

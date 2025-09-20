@@ -17,8 +17,13 @@ const filterByIp = async (id, queues) => {
   const cidrs = ipvs.map((i) => `${i.red}/${i.cidr}`).filter(Boolean);
 
   return queues.filter((q) => {
-    if (!q.target) return false; // 👈 si no hay target, lo brincamos
+    if (!q.target) return false;
+
     const [ipTarget] = q.target.split("/");
+
+    // Validar que realmente sea una IP
+    if (!ipLib.isV4Format(ipTarget)) return false;
+
     return cidrs.some((cidr) => ipLib.cidrSubnet(cidr).contains(ipTarget));
   });
 };
@@ -47,7 +52,6 @@ const getQueesTrafic = async ({ ip, port, password, user, id }) => {
 
     const registros = [];
     const updates = [];
-
     for (let q of queues) {
       const [upStr, downStr] = q.bytes.split("/");
       const upActual = parseInt(upStr);
@@ -84,23 +88,33 @@ const getQueesTrafic = async ({ ip, port, password, user, id }) => {
       let baseUp = 0;
       let baseDown = 0;
 
-     if (ultimoAyer) {
+      if (ultimoAyer) {
         baseUp = ultimoAyer.up;
         baseDown = ultimoAyer.down;
       }
 
       // Calcular delta con reinicio contemplado
       const deltaUp = upActual >= baseUp ? upActual - baseUp : upActual;
-      const deltaDown = downActual >= baseDown ? downActual - baseDown : downActual;
+      const deltaDown =
+        downActual >= baseDown ? downActual - baseDown : downActual;
 
-      console.log('SUBIDA ACTUAL',upActual,"diferencia - ",ultimoAyer.up,"=+++++++",upActual-ultimoAyer.up,"DELTEA",deltaUp);
+      console.log(
+        "SUBIDA ACTUAL",
+        upActual,
+        "diferencia - ",
+        ultimoAyer.up,
+        "=+++++++",
+        upActual - ultimoAyer.up,
+        "DELTEA",
+        deltaUp
+      );
 
       if (ultimoHoy) {
         // actualizar acumulando el delta
         updates.push({
           id: ultimoHoy.id,
-          up:  deltaUp,
-          down:  deltaDown,
+          up: deltaUp,
+          down: deltaDown,
         });
       } else {
         // primer registro del día → crear nuevo
@@ -130,12 +144,13 @@ const getQueesTrafic = async ({ ip, port, password, user, id }) => {
       );
     }
 
-    console.log(`MK ${ip}: insertados ${registros.length}, actualizados ${updates.length}`);
+    console.log(
+      `MK ${ip}: insertados ${registros.length}, actualizados ${updates.length}`
+    );
   } catch (err) {
     console.error(`Error al procesar MK ${ip}:`, err.message);
   }
 };
-
 
 const getTraficmks = async () => {
   const mikrotikIPs = await Servers.findAll();

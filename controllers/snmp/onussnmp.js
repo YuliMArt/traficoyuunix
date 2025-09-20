@@ -70,7 +70,7 @@ const getOnus = (olt,host,community) => {
     fetchOid(oids.name, "name"),
     fetchOid(oids.status, "status"),
     fetchOid(oids.nserie, "nserie"),
-    fetchOid(oids.modelo, "info"),
+    fetchOid(oids.modelo, "modelo"),
     fetchOid(oids.sigonu, "sigonu"),
     fetchOid(oids.sigolt, "sigolt"),
     fetchOid(oids.lastreason, "lastreason"),
@@ -85,6 +85,7 @@ const getOnus = (olt,host,community) => {
         "name",
         "info",
         "nserie",
+        "modelo",
         "lastreason",
       ],
     });
