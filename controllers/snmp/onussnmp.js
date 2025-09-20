@@ -1,6 +1,7 @@
 const snmp = require("snmp-native");
 const Onu = require("../../models/ynx/onus");
 const Olt = require("../../models/ynx/olts");
+const { Sequelize } = require("sequelize");
 
 const MonitOnusOlt = async () => {
   const olts = await Olt.findAll();
@@ -9,7 +10,7 @@ const MonitOnusOlt = async () => {
     await getVlanMac(olt.id, olt.ip, olt.com_rw);
   }
 };
-const getOnus = (olt,host,community) => {
+const getOnus = (olt, host, community) => {
   const oids = {
     name: ".1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24", // nombre ONU
     status: ".1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16", // estatus
@@ -89,13 +90,46 @@ const getOnus = (olt,host,community) => {
         "lastreason",
       ],
     });
-
+    await syncOnus(result, olt);
     return result;
   });
 
   return onusDb;
 };
-const getVlanMac = (olt,host,community) => {
+
+const syncOnus = async (onusSnmp, idOlt = 1) => {
+  // 1️⃣ Traer todas las ONUs de la DB para esta OLT
+  const onusDb = await Onu.findAll({
+    where: { id_olt: idOlt },
+    attributes: ["port", "sub"],
+  });
+
+  // 2️⃣ Crear sets para comparar
+  const existingKeys = new Set(onusSnmp.map((o) => `${o.port}-${o.sub}`));
+  const dbKeys = onusDb.map((o) => `${o.port}-${o.sub}`);
+
+  // 3️⃣ Filtrar las ONUs que ya no existen
+  const toDelete = dbKeys.filter((k) => !existingKeys.has(k));
+
+  // 4️⃣ Eliminar solo las que no existen en SNMP
+  if (toDelete.length > 0) {
+    await Onu.destroy({
+      where: {
+        id_olt: idOlt,
+        [Sequelize.Op.or]: toDelete.map((k) => {
+          const [port, sub] = k.split("-").map(Number);
+          return { port, sub };
+        }),
+      },
+    });
+  }
+
+  console.log(
+    `Se eliminaron ${toDelete.length} ONUs que ya no existen en la OLT.`
+  );
+};
+
+const getVlanMac = (olt, host, community) => {
   const oids = {
     portsub: ".1.3.6.1.4.1.37950.1.1.5.10.3.5.1.5",
     mac: ".1.3.6.1.4.1.37950.1.1.5.10.3.5.1.3",
@@ -188,5 +222,5 @@ const getVlanMac = (olt,host,community) => {
 module.exports = {
   getOnus,
   getVlanMac,
-  MonitOnusOlt
+  MonitOnusOlt,
 };
