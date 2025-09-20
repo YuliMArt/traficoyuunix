@@ -4,6 +4,9 @@ const TrD = require("../models/trdays");
 const { QueryTypes } = require("sequelize");
 const Servicio = require("../models/tblservicios");
 const Emisor = require("../models/emisores");
+const  ping = require('ping');
+
+const Olt = require("../models/ynx/olts");
 const sumTraficDay = async () => {
   const dia = moment().format("YYYY-MM-DD");
 
@@ -58,8 +61,26 @@ const pingClientes = async () => {
     }
   }
 };
+const pingOlts = async () => {
+  const olts = await Olt.findAll();
+  for (let i = 0; i < olts.length; i++) {
+    const rts = olts[i];
+    let res = await ping.promise.probe(rts.ip);
+    let alive = "ONLINE";
+    if (!res.alive) alive = "OFFLINE";
+    if (alive != rts.status) {
+      await Olt.update(
+        { status: alive },
+        {
+          where: { id: rts.id },
+        }
+      );
+    }
+  }
+};
 
 module.exports = {
   sumTraficDay,
   pingClientes,
+  pingOlts,
 };

@@ -1,0 +1,72 @@
+Name, OID, Type, Value name
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.1, OctetString, MejiaPatricia
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.2, OctetString, MejiaVanegasAlfonso
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.3, OctetString, ValerioBeccerilMarco
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.4, OctetString, CordovaVzquezBeatriz
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.5, OctetString, RebolloMirandaOctavio
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.6, OctetString, MonroyGarciaPamela
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.7, OctetString, VelazquezMendiolaErikaRubi
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.8, OctetString, EscutiaMtZMaJuana
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.9, OctetString, GuadalupeGomezGarcia
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.24.1.10, OctetString, MendiolaVanegasAzuryLizet
+
+Name, OID, Type, Value status
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.1, Integer, 1
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.2, Integer, 1
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.3, Integer, 1
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.4, Integer, 1
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.5, Integer, 1
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.6, Integer, 1
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.7, Integer, 1
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.8, Integer, 1
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.9, Integer, 1
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.16.1.10, Integer, 1
+
+Name, OID, Type, Value nserie
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.1, OctetString, GPON0053c2d8
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.2, OctetString, GPON0053d150
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.3, OctetString, HWTC030e9faf
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.4, OctetString, GPON0053d368
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.5, OctetString, GPON0053cb18
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.6, OctetString, GPON0053a3e8
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.7, OctetString, HWTCdf0bb4af
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.8, OctetString, GPON0053d650
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.9, OctetString, GPON0053c438
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.4.1.5.1.10, OctetString, GPON0053ce78
+
+Name, OID, Type, Value modelo
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.1, OctetString, V412
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.2, OctetString, V412
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.3, OctetString, HG8145V5V3
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.4, OctetString, V412
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.5, OctetString, V412
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.6, OctetString, V412
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.7, OctetString, HG8145X6-10
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.8, OctetString, V412
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.9, OctetString, V412
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6.1.10, OctetString, V412
+
+Name, OID, Type, Value onu tx
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.1, OctetString, -14.21
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.2, OctetString, -16.62
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.3, OctetString, -20.76
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.4, OctetString, -13.85
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.5, OctetString, -14.31
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.6, OctetString, -17.35
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.7, OctetString, -24.32
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.8, OctetString, -18.57
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.9, OctetString, -14.54
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7.1.10, OctetString, -17.55
+
+
+Name, OID, Type, Value LAST REASON
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.1, OctetString, Power Off
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.2, OctetString, Power Off
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.3, OctetString, Power Off
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.4, OctetString, Power Off
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.5, OctetString, Power Off
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.6, OctetString, Power Off
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.7, OctetString, Power Off
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.8, OctetString, Power Off
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.9, OctetString, Power Off
+null, .1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4.1.10, OctetString, Power Off
