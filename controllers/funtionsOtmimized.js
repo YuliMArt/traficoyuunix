@@ -87,7 +87,7 @@ const pingOlts = async () => {
       await Olt.update({ counter: rts.counter + 1 }, { where: { id: rts.id } });
 
       if (rts.counter > 5 && res.alive != chOlt) {
-        await Olt.update({ status: 0 }, { where: { id: rts.id } });
+        await Olt.update({ status: "OFFLINE" }, { where: { id: rts.id } });
       }
     }
   }

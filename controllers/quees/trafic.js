@@ -40,7 +40,6 @@ const getQueesTrafic = async ({ ip, port, password, user, id }) => {
 
     const response = await axios.request(config);
     let queues = await filterByIp(id, response.data);
-
     const servicios = await Servicio.findAll({
       attributes: ["id", "idnodo", "mac", "idcliente", "ip"],
       where: { idnodo: id },

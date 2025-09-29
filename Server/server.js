@@ -41,8 +41,8 @@ class Server {
     cron.schedule("*/2 * * * *", async () => {
       pingOlts();
     });
-    MonitOnusOlt();
     cron.schedule("*/15 * * * *", async () => {
+      MonitOnusOlt();
     });
     // cron.schedule("*/20 * * * *", async () => {
     //   pingClientes();
