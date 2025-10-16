@@ -18,7 +18,8 @@ const getOnus = (olt, host, community) => {
     modelo: ".1.3.6.1.4.1.37950.1.1.6.1.1.2.1.6", // modelo ONU
     sigonu: ".1.3.6.1.4.1.37950.1.1.6.1.1.3.1.7", // señal ONU
     sigolt: ".1.3.6.1.4.1.37950.1.1.6.1.1.3.1.8", // señal OLT
-    lastreason: ".1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4", // última razón de caída
+    // lastreason: ".1.3.6.1.4.1.37950.1.1.6.1.1.23.1.4", // última razón de caída
+    lastreason: ".1.3.6.1.4.1.37950.1.1.6.1.1.1.1.10", // última razón de caída
   };
 
   const session = new snmp.Session({

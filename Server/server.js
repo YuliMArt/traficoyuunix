@@ -7,7 +7,7 @@ const exp = express();
 const server = http.createServer(exp);
 const cron = require("node-cron");
 const { getTraficmks } = require("../controllers/quees/trafic");
-const { pingOlts } = require("../controllers/funtionsOtmimized");
+const { pingOlts, pingClientes } = require("../controllers/funtionsOtmimized");
 const { MonitOnusOlt } = require("../controllers/snmp/onussnmp");
 class Server {
   constructor() {
@@ -34,19 +34,18 @@ class Server {
   }
 
   async cronsTab() {
-    cron.schedule("*/15 * * * *", async () => {
-      getTraficmks();
-    });
-
+    // // cron.schedule("*/15 * * * *", async () => {
+    // getTraficmks();
+    // // });
     cron.schedule("*/2 * * * *", async () => {
       pingOlts();
     });
     cron.schedule("*/15 * * * *", async () => {
       MonitOnusOlt();
     });
-    // cron.schedule("*/20 * * * *", async () => {
-    //   pingClientes();
-    // });
+    cron.schedule("*/5 * * * *", async () => {
+      pingClientes();
+    });
   }
   middlewares() {
     // CORS

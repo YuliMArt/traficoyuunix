@@ -6,8 +6,9 @@ const Servers = require("../../models/servers");
 const Ipv4s = require("../../models/ynx/Ipv4");
 const Servicio = require("../../models/tblservicios");
 const TraficoCus = require("../../models/tltrafico");
-const { Sequelize } = require("sequelize");
+const { Sequelize, Op } = require("sequelize");
 const moment = require("moment");
+const RadAcc = require("../../models/ppoerad");
 
 const buildAuthHeader = (user, password) =>
   "Basic " + Buffer.from(`${user}:${password}`).toString("base64");
@@ -39,6 +40,9 @@ const getQueesTrafic = async ({ ip, port, password, user, id }) => {
     };
 
     const response = await axios.request(config);
+
+    console.log("********:", response.data);
+    return;
     let queues = await filterByIp(id, response.data);
     const servicios = await Servicio.findAll({
       attributes: ["id", "idnodo", "mac", "idcliente", "ip"],
@@ -154,12 +158,46 @@ const getQueesTrafic = async ({ ip, port, password, user, id }) => {
 const getTraficmks = async () => {
   const mikrotikIPs = await Servers.findAll();
 
-  mikrotikIPs.forEach(async ({ id, ip, user, pass, portweb }) => {
+  mikrotikIPs.forEach(async ({ id, ip, user, pass, portweb, seguridad }) => {
     let password = CryptoJS.AES.decrypt(pass, "YUUNIX24").toString(
       CryptoJS.enc.Utf8
     );
-    await getQueesTrafic({ ip, port: portweb, password, user, id });
+
+    if (seguridad != 2) {
+      // await getQueesTrafic({ ip, port: portweb, password, user, id });
+    }
+
+    if (seguridad === 2) {
+    }
   });
+};
+
+const getTraficPpoe = async (id) => {
+  // const ipv4 =await Ipv4s
+  const servicios = await Servicio.findAll({ where: { id_nodo: id } });
+  for (let ser of servicios) {
+    const trafic = {
+      idser: ser.id,
+      ip: ser.ip,
+      idus: ser.idcliente,
+      idmk: id,
+    };
+    const today = moment().format("YYYY-MM-DD");
+
+    const traficR = await RadAcc.findOne({
+      where: { [Op.and]: [{ ip: ser.ip }, { fecha: today }] },
+    });
+    const ultimoHoy = await TraficoCus.findOne({
+      where: {
+        idser: ser.id,
+        idus: ser.idcliente,
+        idmk: ser.idnodo,
+        ip: traficR.framedipaddress,
+        fecha: today,
+      },
+      order: [["id", "DESC"]],
+    });
+  }
 };
 module.exports = {
   getTraficmks,

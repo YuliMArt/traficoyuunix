@@ -43,7 +43,7 @@ const sumTraficDay = async () => {
 };
 const pingClientes = async () => {
   let clientes = await db.query(
-    ` SELECT ts.*, us.estado  FROM tblservicios ts JOIN usuarios us ON ts.idcliente=us.id  WHERE  us.estado='ACTIVO' `,
+    ` SELECT ts.*, us.estado  FROM tblservicios ts JOIN usuarios us ON ts.idcliente=us.id  WHERE  us.estado='ACTIVO' AND ts.status="OFFLINE" `,
     { type: QueryTypes.SELECT }
   );
   for (let i = 0; i < clientes.length; i++) {
