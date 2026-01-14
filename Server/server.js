@@ -6,7 +6,6 @@ const db = require("../database/conexion");
 const exp = express();
 const server = http.createServer(exp);
 const cron = require("node-cron");
-const { getTraficmks } = require("../controllers/quees/trafic");
 const { pingOlts, pingClientes } = require("../controllers/funtionsOtmimized");
 const { MonitOnusOlt } = require("../controllers/snmp/onussnmp");
 class Server {
@@ -34,9 +33,6 @@ class Server {
   }
 
   async cronsTab() {
-    // // cron.schedule("*/15 * * * *", async () => {
-    // getTraficmks();
-    // // });
     cron.schedule("*/2 * * * *", async () => {
       pingOlts();
     });
