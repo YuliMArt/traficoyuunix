@@ -9,13 +9,6 @@ const ping = require("ping");
 const Olt = require("../models/ynx/olts");
 const sumTraficDay = async () => {
   const dia = moment().format("YYYY-MM-DD");
-
-  // const traficTem = await dbTr.query(
-  //   `SELECT SUM(down) as total_down, SUM(up) as total_up FROM comtrafics WHERE fecha = '${dia}'`,
-  //   {
-  //     type: QueryTypes.SELECT,
-  //   }
-  // );
   const traficTem = await db.query(
     `SELECT SUM(down) as total_down, SUM(up) as total_up FROM traficoCus WHERE fecha = '${dia}'`,
     {
