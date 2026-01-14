@@ -10,9 +10,8 @@ from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import ijson
 
-# Forzar flush inmediato en stdout/stderr
+# Forzar salida inmediata en consola
 sys.stdout.reconfigure(line_buffering=True)
-sys.stderr.reconfigure(line_buffering=True)
 
 DB_CONFIG = {
     "host": "192.168.10.254",
@@ -23,211 +22,163 @@ DB_CONFIG = {
 }
 
 BASE_DIR = "/var/cache/nfdump"
+NUM_WORKERS = 10 
+NUM_FILES = 20
 
-NUM_WORKERS = 20  # Ajusta segun RAM disponible
-NUM_FILES = 10   # Numero de archivos a procesar
-
-def obtener_redes():
-    conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor()
-    cursor.execute("SELECT red, cidr FROM ipv4s WHERE cidr BETWEEN 0 AND 32")
-    redes = []
-    for red, cidr in cursor.fetchall():
-        try:
-            net = ipaddress.IPv4Network(f"{red}/{cidr}", strict=False)
-            redes.append((int(net.network_address), int(net.broadcast_address)))
-        except Exception as e:
-            print(f"?? Error red {red}/{cidr}: {e}", flush=True)
-    cursor.close()
-    conn.close()
-    return redes
-
-def ip_en_redes(ip, redes):
+def obtener_datos_maestros():
     try:
-        ip_int = int(ipaddress.IPv4Address(ip))
-        return any(start <= ip_int <= end for start, end in redes)
-    except Exception:
-        return False
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        cursor.execute("SELECT red, cidr FROM ipv4s WHERE cidr BETWEEN 0 AND 32")
+        redes = []
+        for row in cursor.fetchall():
+            net = ipaddress.IPv4Network(f"{row['red']}/{row['cidr']}", strict=False)
+            redes.append((int(net.network_address), int(net.broadcast_address)))
+        
+        cursor.execute("SELECT ip, idcliente, id, idnodo, mac FROM tblservicios WHERE ip IS NOT NULL")
+        clientes = {row['ip']: row for row in cursor.fetchall()}
+        
+        cursor.close()
+        conn.close()
+        return redes, clientes
+    except Exception as e:
+        print(f"❌ Error crítico DB: {e}")
+        sys.exit(1)
 
 def crear_flow_hash(flow):
-    """Crea un hash único para identificar flujos duplicados"""
-    key_fields = [
-        str(flow.get("src4_addr", "")),
-        str(flow.get("dst4_addr", "")),
-        str(flow.get("src_port", 0)),
-        str(flow.get("dst_port", 0)),
-        str(flow.get("proto", 0)),
-        str(flow.get("first", 0)),
-        str(flow.get("last", 0)),
-        str(flow.get("in_bytes", 0)),
-        str(flow.get("in_pkts", 0))
-    ]
-    flow_string = "|".join(key_fields)
-    return hashlib.md5(flow_string.encode()).hexdigest()
+    key = f"{flow.get('src4_addr')}{flow.get('dst4_addr')}{flow.get('first')}{flow.get('in_bytes')}"
+    return hashlib.md5(key.encode()).hexdigest()
 
 def procesar_archivo(file_path, redes):
     subida = defaultdict(int)
     bajada = defaultdict(int)
     seen_flows = set()
-    flows_procesados = 0
-    flows_duplicados = 0
     
     try:
         process = subprocess.Popen(
-            ["nfdump", "-r", file_path, "-o", "json", "-n", "all"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            ["nfdump", "-r", file_path, "-o", "json"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
 
-        for flow in ijson.items(process.stdout, "item"):
-            flows_procesados += 1
-            flow_hash = crear_flow_hash(flow)
+        try:
+            # ijson.items puede fallar si nfdump devuelve "No matched flows"
+            for flow in ijson.items(process.stdout, "item"):
+                f_hash = crear_flow_hash(flow)
+                if f_hash in seen_flows: continue
+                seen_flows.add(f_hash)
 
-            if flow_hash in seen_flows:
-                flows_duplicados += 1
-                continue
+                src, dst = flow.get("src4_addr"), flow.get("dst4_addr")
+                bytes_ = flow.get("in_bytes", 0)
 
-            seen_flows.add(flow_hash)
-            src = flow.get("src4_addr")
-            dst = flow.get("dst4_addr")
-            bytes_ = flow.get("in_bytes", 0)
+                if not src or not dst: continue
 
-            if not src or not dst or bytes_ <= 0:
-                continue
+                s_int = int(ipaddress.IPv4Address(src))
+                d_int = int(ipaddress.IPv4Address(dst))
+                
+                en_src = any(start <= s_int <= end for start, end in redes)
+                en_dst = any(start <= d_int <= end for start, end in redes)
 
-            en_src = ip_en_redes(src, redes)
-            en_dst = ip_en_redes(dst, redes)
+                if en_src and not en_dst:
+                    subida[src] += bytes_
+                elif en_dst and not en_src:
+                    bajada[dst] += bytes_
+        except ijson.common.IncompleteJSONError:
+            # Captura el error cuando el archivo está vacío o no es JSON válido
+            pass
 
-            if en_src and not en_dst:
-                subida[src] += bytes_
-            elif en_dst and not en_src:
-                bajada[dst] += bytes_
-
-        _, stderr = process.communicate()
-        if stderr:
-            print(f"?? nfdump error ({file_path}): {stderr.strip()}", flush=True)
-
-        flows_unicos = flows_procesados - flows_duplicados
-        if flows_procesados > 0:
-            porcentaje_dup = (flows_duplicados / flows_procesados) * 100
-            print(f"?? {os.path.basename(file_path)}: {flows_procesados} flows, {flows_duplicados} duplicados ({porcentaje_dup:.1f}%), {flows_unicos} únicos", flush=True)
-
+        process.wait()
     except Exception as e:
-        print(f"?? Error procesando {file_path}: {e}", flush=True)
-
+        print(f"⚠️ Error en nfdump para {file_path}: {e}")
+    
     return subida, bajada
 
-def insertar_trafico_mysql(subida, bajada, fecha):
+def insertar_trafico_directo(subida, bajada, fecha, mapa_clientes):
     if not subida and not bajada:
-        return
+        return "ℹ️ Sin datos de clientes."
 
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
+    
+    ips_archivo = set(list(subida.keys()) + list(bajada.keys()))
+    values = []
 
-    try:
-        values = []
-        for ip in set(list(subida.keys()) + list(bajada.keys())):
-            up = subida.get(ip, 0)
-            down = bajada.get(ip, 0)
-            values.append((ip, up, down, fecha))
+    for ip in ips_archivo:
+        if ip in mapa_clientes:
+            c = mapa_clientes[ip]
+            values.append((ip, subida.get(ip, 0), bajada.get(ip, 0), c['idcliente'], c['id'], c['idnodo'], c['mac'], fecha))
 
-        sql = """
-        INSERT INTO trafico (ip, up, down, fecha) VALUES (%s, %s, %s, %s)
+    if not values: return "ℹ️ IPs no registradas."
+
+    sql = """
+        INSERT INTO traficoCus (ip, up, down, idus, idser, idmk, mac, fecha)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             up = up + VALUES(up),
             down = down + VALUES(down)
-        """
+    """
 
+    try:
         cursor.execute("START TRANSACTION")
-        cursor.executemany(sql, values)
+        for i in range(0, len(values), 500):
+            cursor.executemany(sql, values[i:i+500])
+        conn.commit()
+        return f"✅ {len(values)} clientes actualizados."
+    except Exception as e:
+        conn.rollback()
+        return f"❌ Error DB: {e}"
+    finally:
+        cursor.close()
+        conn.close()
 
-        sql_sync = """
-            INSERT INTO traficoCus (ip, up, down, idus, idser, idmk, mac, fecha)
-            SELECT
-                t.ip,
-                SUM(t.up) AS up,
-                SUM(t.down) AS down,
-                s.idcliente,
-                s.id,
-                s.idnodo as idmk,
-                s.mac,
-                t.fecha
-            FROM trafico t
-            JOIN tblservicios s ON t.ip = s.ip
-            WHERE t.fecha = %s
-            GROUP BY t.ip, t.fecha, s.idcliente, s.id, s.idnodo, s.mac
-            ON DUPLICATE KEY UPDATE
-                traficoCus.up = traficoCus.up + VALUES(up),
-                traficoCus.down = traficoCus.down + VALUES(down),
-                traficoCus.idus = VALUES(idus),
-                traficoCus.idser = VALUES(idser),
-                traficoCus.idmk = VALUES(idmk),
-                traficoCus.mac = VALUES(mac)
-        """
-        cursor.execute(sql_sync, (fecha,))
-        cursor.execute("DELETE FROM trafico WHERE fecha = %s", (fecha,))
-        cursor.execute("COMMIT")
-        print(f"?? Insertados {len(values)} registros para fecha {fecha}", flush=True)
+def worker(file_path, redes, mapa_clientes):
+    # Extraemos carpeta y nombre de archivo para el log
+    folder_name = os.path.basename(os.path.dirname(file_path))
+    file_name = os.path.basename(file_path)
 
-    except mysql.connector.Error as e:
-        print(f"? Error MySQL ({fecha}): {e}", flush=True)
-        cursor.execute("ROLLBACK")
+    if "current" in file_name:
+        return f"🟡 Saltando archivo en uso: [{folder_name}/{file_name}]"
 
-    cursor.close()
-    conn.close()
+    try:
+        f_raw = file_name.split(".")[1].split("_")[0]
+        fecha = f"{f_raw[:4]}-{f_raw[4:6]}-{f_raw[6:8]}"
+    except:
+        return f"❌ Formato inválido: [{folder_name}/{file_name}]"
 
-def worker(file_path, redes):
-    basename = os.path.basename(file_path)
-    if basename.startswith("nfcapd.current") or not basename.startswith("nfcapd."):
-        return f"? Ignorado archivo temporal: {basename}"
-
-    parts = basename.split(".", 1)
-    fecha_raw = parts[1]
-    fecha_hora = fecha_raw.split("_")[0]
-
-    if not fecha_hora.isdigit() or len(fecha_hora) < 8:
-        return f"? Nombre de archivo invalido: {basename}"
-
-    fecha = f"{fecha_hora[:4]}-{fecha_hora[4:6]}-{fecha_hora[6:8]}"
+    # Procesar
     subida, bajada = procesar_archivo(file_path, redes)
-    insertar_trafico_mysql(subida, bajada, fecha)
+    res_db = insertar_trafico_directo(subida, bajada, fecha, mapa_clientes)
 
+    # Eliminar
     if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-            return f"? Procesado y eliminado: {file_path}"
-        except Exception as e:
-            return f"?? Error al eliminar {file_path}: {e}"
-    else:
-        return f"?? Archivo ya no existe: {file_path}"
+        os.remove(file_path)
+    
+    return f"📂 [{folder_name}] 📄 {file_name} -> {res_db}"
 
 def main():
-    redes = obtener_redes()
-    print(f"?? Redes cargadas: {len(redes)}", flush=True)
-
+    redes, mapa_clientes = obtener_datos_maestros()
+    print(f"\n🚀 Iniciando procesamiento de tráfico...")
+    
     archivos = []
-    for dir_path in glob.glob(f"{BASE_DIR}/*/"):
-        for file_path in glob.glob(f"{dir_path}/nfcapd.*"):
-            basename = os.path.basename(file_path)
-            if basename.startswith("nfcapd.current"):
-                continue
-            archivos.append(file_path)
-
+    for f in glob.glob(f"{BASE_DIR}/*/nfcapd.*"):
+        if "current" not in f: archivos.append(f)
+    
     archivos = sorted(archivos)[:NUM_FILES]
-    total = len(archivos)
-    if not total:
-        print("?? No hay archivos para procesar.")
+    if not archivos:
+        print("☕ Nada nuevo que procesar.")
         return
 
-    print(f"?? Procesando {total} archivos con {NUM_WORKERS} procesos en paralelo", flush=True)
-    count = 0
+    print(f"📂 Encontrados {len(archivos)} archivos. Procesando...\n")
+
     with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
-        futures = [executor.submit(worker, f, redes) for f in archivos]
+        futures = [executor.submit(worker, f, redes, mapa_clientes) for f in archivos]
         for future in as_completed(futures):
-            result = future.result()
-            count += 1
-            print(f"[{count}/{total}] {result}", flush=True)
+            try:
+                print(f"  {future.result()}")
+            except Exception as e:
+                print(f"  ❌ Error en worker: {e}")
+
+    print(f"\nTerminado. ✨\n")
 
 if __name__ == "__main__":
     main()
